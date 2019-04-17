@@ -29,7 +29,7 @@ class ViewController: UIViewController {
             print("Cancel button pressed")
         }
         popup.actions = [action1, action2]
-        popup.show(in: self, true)
+        popup.show()
     }
     
 }

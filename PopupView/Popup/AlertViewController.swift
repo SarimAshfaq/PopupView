@@ -13,6 +13,7 @@ class PopupView {
     private var messageString: String? = nil
     private var buttons: [PopupAction] = []
     private var picture: UIImage? = nil
+    private var gesture: Bool = true
     
     public var actions: [PopupAction]{
         get{
@@ -26,22 +27,23 @@ class PopupView {
     init() {
     }
     
-    init(_ title: String? , _ message: String?, _ image: UIImage?) {
+    init(_ title: String? , _ message: String?, _ image: UIImage?, _ gestureDismissal: Bool = true) {
         titleString = title
         messageString = message
         picture = image
+        gesture = gestureDismissal
     }
     
-    func show(in viewController: UIViewController, _ animated: Bool){
+    func show(){
         let vc = AlertViewController(nibName: "AlertViewController", bundle: nil)
-//        vc.modalTransitionStyle = .crossDissolve
-        vc.modalPresentationStyle = .overFullScreen
+        vc.allowedDismissDirection = gesture ? .bottom:.none
         vc.buttons = buttons
         vc.titleString = titleString
         vc.messageString = messageString
-        vc.animated = animated
         vc.picture = picture
-        viewController.present(vc, animated: false,completion: nil)
+        vc.maskType = .lightBlur
+        vc.gestureDismissal = gesture
+        vc.showInteractive()
     }
     
 }
@@ -74,10 +76,9 @@ extension Notification.Name{
     static let popupComplitionAction = Notification.Name("popupComplitionAction")
 }
 
-class AlertViewController: UIViewController {
+class AlertViewController: InteractiveViewController {
     
     @IBOutlet weak var alertView: UIView!
-    @IBOutlet weak var backImage: UIImageView!
     @IBOutlet weak var buttonsView: UIView!
     @IBOutlet weak var buttonViewHeight: NSLayoutConstraint!
     @IBOutlet weak var popupImage: UIImageView!
@@ -85,6 +86,7 @@ class AlertViewController: UIViewController {
     @IBOutlet weak var popupTitle: UILabel!
     @IBOutlet weak var popupMessage: UITextView!
     @IBOutlet weak var imageBottom: NSLayoutConstraint!
+    @IBOutlet weak var alertViewWidth: NSLayoutConstraint!
     
     var picture: UIImage? = nil
     var titleString: String? = nil
@@ -93,9 +95,16 @@ class AlertViewController: UIViewController {
     var alertButtons: [AlertButton] = []
     var animated: Bool = true
     var indexTag: Int = 0
+    var gestureDismissal: Bool = true
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            alertViewWidth.constant = 340
+        } else {
+            alertViewWidth.constant = 300
+        }
         
         alertView.layer.cornerRadius = 5.0
         popupImageHeight.constant = picture != nil ? 100:0
@@ -138,16 +147,11 @@ class AlertViewController: UIViewController {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
     }
-    @IBAction func tapAction(_ sender: UITapGestureRecognizer) {
-        dismissAlertView()
-    }
-    
-    @IBAction func swipeAction(_ sender: UIPanGestureRecognizer) {
-        dismissOnSwipe(sender: sender)
-    }
-    
-    @IBAction func alertViewSwipeAction(_ sender: UIPanGestureRecognizer) {
-        dismissOnSwipe(sender: sender)
+    @IBAction func tapAction(_ sender: UIButton) {
+        if !gestureDismissal {
+            return
+        }
+        self.dismissWindow(.bottom)
     }
     
     func resizeAlertView(){
@@ -155,8 +159,6 @@ class AlertViewController: UIViewController {
         let titleFrame = popupTitle.frame
         let totalHeight = textViewFrame.height + titleFrame.height + buttonViewHeight.constant + popupImageHeight.constant + 36.0
         let alertBounds = alertView.frame
-        print(alertBounds.height)
-        print(self.view.bounds.height - 100)
         if totalHeight >= self.view.bounds.height - 100 {
             let newHeight = self.view.bounds.height - (100 + 32.0 + titleFrame.height + buttonViewHeight.constant + popupImageHeight.constant)
             popupMessage.frame = CGRect(x: textViewFrame.origin.x, y: textViewFrame.origin.y, width: textViewFrame.width, height: newHeight)
@@ -166,57 +168,6 @@ class AlertViewController: UIViewController {
         }
     }
     
-    func dismissOnSwipe(sender: UIPanGestureRecognizer){
-        let velocity = sender.velocity(in: self.view)
-        if velocity.y < 0 {
-            UIView.animate(withDuration: 1, delay: 0, options: .curveEaseInOut, animations: {
-                self.alertView.center.y = self.alertView.center.y - 1
-                if self.alertView.center.y <= self.view.center.y - 150 {
-//                    self.view.alpha = 1
-                    self.alertView.center.y = self.view.center.y
-                }
-            }) { (status) in
-                
-            }
-        } else {
-            UIView.animate(withDuration: 0.03, delay: 0, options: .curveEaseInOut, animations: {
-//                self.view.alpha -= 0.05
-                self.alertView.center.y = self.alertView.center.y + 10
-                if self.alertView.center.y >= self.view.center.y + 200 {
-                    self.backImage.isHidden = true
-                    self.alertView.center.y = self.alertView.center.y + 500
-                    self.dismiss(animated: true, completion: nil)
-                }
-            }) { (status) in
-                
-            }
-        }
-        
-        if sender.state == .ended {
-            UIView.animate(withDuration: 0.05, delay: 0, options: .curveEaseInOut, animations: {
-                self.alertView.center.y = self.view.center.y
-            }) { (status) in
-                
-            }
-        }
-    }
-    
-    func dismissAlertView(){
-        for _ in 0...4 {
-            UIView.animate(withDuration: 0.6, delay: 0, options: .curveEaseInOut, animations: {
-                self.alertView.center.y = self.alertView.center.y + 50
-                if self.alertView.center.y >= self.view.center.y + 200 {
-                    self.backImage.isHidden = true
-                    self.alertView.center.y = self.alertView.center.y + 500
-                    self.dismiss(animated: true, completion: nil)
-                }
-            }) { (status) in
-                
-            }
-        }
-        
-    }
-    
 }
 
 extension AlertViewController: AlertViewButtonDelegate {
@@ -224,7 +175,7 @@ extension AlertViewController: AlertViewButtonDelegate {
         if let action = buttons[tag].buttonAction {
             action()
         }
-        dismissAlertView()
+        self.dismissWindow(.bottom)
     }
 }
 
